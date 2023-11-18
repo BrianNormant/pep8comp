@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
         }
         // Parse file syntax
         parse_init(f);
+        print_parsed();
         if (!parse()) return EXIT_FAILURE;
         parse_deinit();
 

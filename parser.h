@@ -6,7 +6,7 @@
 #define MAXCOLS 100
 #define MAXLBL 50
 
-#define LINE_PATTERN (PCRE2_SPTR)"^[ \\t]*([^: ]+:)?[ \\t]*(\\.?[a-zA-Z]+)?[ \\t]*((.*?)(,[idnsxf]{1,3})|(.*))?$"
+#define LINE_PATTERN (PCRE2_SPTR)"^[ \\t]*([^: ]+:)?[ \\t]*(\\.?[a-zA-Z]+)?[ \\t]*((.*?)(,[idnsxf]{1,3})|(.*))?"
 #define ARG_PATTERN (PCRE2_SPTR)"(0x[A-Fa-f0-9]{4}|0x[A-Fa-f0-9]{2}(?=$))?([\\+-]?\\d+)?('.')?(.+)?"
 #define STR_PATTERN (PCRE2_SPTR)"\"(.*)\"(?=$)"
 #define PARSE_SIZE (PARSE_SIZE)"(?<=^)(\\d+)(?=$)"

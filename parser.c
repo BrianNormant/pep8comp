@@ -86,7 +86,10 @@ parse_init(FILE* file)
         size_matchd = pcre2_match_data_create_from_pattern(size_re, NULL);
         // Read all lines from the file and store them in line
         int line = 0,
-            col = 0;
+            col = 0,
+            quote = 0,
+            escape = 0,
+            wait_for_nl = 0;
         while (1) {
                 if (line >= MAXLINES) {
                         perror("Too many lines in file");
@@ -99,11 +102,36 @@ parse_init(FILE* file)
                 }
                 char c = fgetc(file);
                 if (c == EOF) break;
+                if (wait_for_nl) {
+                        if (c == '\n' || c == '\r') {
+                                wait_for_nl = 0;
+                                continue;
+                        } else continue;
+                }
                 if (c == '\n' || c == '\r') {
                         line++;
                         source_lines[line][col] = '\0';
-                        col = 0;
+                        col = quote = escape = 0;
                         continue;
+                }
+                if (c == ';' && !quote) {
+                        line++;
+                        col = quote = escape = 0;
+                        source_lines[line][col] = '\0';
+                        wait_for_nl = 1;
+                        continue;
+                }
+                if (c == '"') {
+                        if (quote && !escape) {
+                                quote = 0; // End of string
+                        } else {
+                                quote = 1; // Either first quote or escaped quote 
+                        }
+                }
+                if (escape) { // The character has been escaped so reset escape
+                        escape = 0;
+                } else if (c == '\\') {
+                        escape = 1;
                 }
                 source_lines[line][col] = c;
                 col++;
@@ -332,9 +360,9 @@ parse()
                                 return 0;
                         }
 
-                PCRE2_SPTR instr = line + ovector[2*3];
-                int instr_len = ovector[2*3 + 1] - ovector[2*3];
-                PCRE2_SPTR arg = line + ovector[2*4];
+                PCRE2_SPTR instr = line + ovector[2*2];
+                int instr_len = ovector[2*2 + 1] - ovector[2*2];
+                PCRE2_SPTR arg = line + ovector[2*6];
                 int arg_len = ovector[2*6 + 1] - ovector[2*6];
                 bytecode_pos += instr_byte_size(instr, instr_len, arg, arg_len);
         }
