@@ -1,0 +1,3 @@
+bin
+.unison*
+.ccls-cache*
