@@ -1,34 +1,4 @@
-#include <bits/types/sigevent_t.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <string.h>
-
-#define PCRE2_CODE_UNIT_WIDTH 8
-#include <pcre2.h>
-
-#include "sugar.h"
 #include "parser.h"
-
-static int _initialized = 0;
-
-static char source_lines[MAXLINES][MAXCOLS]; // Storage for lines
-static int lines_cnt = 0;
-
-static struct label_info source_labels[MAXLBL];
-static int label_cnt = 0;
-
-static pcre2_code *line_re;
-static pcre2_match_data *line_matchd;
-static pcre2_code *arg_re;
-static pcre2_match_data *arg_matchd;
-static pcre2_code *str_re;
-static pcre2_match_data *str_matchd;
-static pcre2_code *size_re;
-static pcre2_match_data *size_matchd;
-static int errornumber;
-static unsigned long erroroffset;
 
 int // compile regexes, read file
 parse_init(FILE* file)
@@ -148,6 +118,36 @@ print_parsed()
         FORI(i, 0, lines_cnt) printf("%s\n", source_lines[i]);
 }
 
+void
+printf_bytes(char *program, uint16_t size)
+{
+        assert(_initialized);
+        uint16_t pos = 0;
+        while (pos < size) {
+                printf("|0x%.2hx¦ %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx %.2hhx|", 
+                        pos,
+                        program[pos],
+                        program[pos+1],
+                        program[pos+2],
+                        program[pos+3],
+                        program[pos+4],
+                        program[pos+5],
+                        program[pos+6],
+                        program[pos+7]);
+                printf("%c%c%c%c%c%c%c%c|\n",
+isgraph(program[pos])?program[pos]:'?',
+isgraph(program[pos+1])?program[pos+1]:'?',
+isgraph(program[pos+2])?program[pos+2]:'?',
+isgraph(program[pos+3])?program[pos+3]:'?',
+isgraph(program[pos+4])?program[pos+4]:'?',
+isgraph(program[pos+5])?program[pos+5]:'?',
+isgraph(program[pos+6])?program[pos+6]:'?',
+isgraph(program[pos+7])?program[pos+7]:'?'
+                        );
+                pos+=8;
+        }
+}
+
 void // free mem and exit
 parser_failure() 
 {
@@ -160,160 +160,6 @@ parser_failure()
         pcre2_match_data_free(size_matchd);
         pcre2_code_free(size_re);
 }
-
-int
-match_line(PCRE2_SPTR subject, int line, int *rc, size_t **ov)
-{
-        *rc = pcre2_match(
-                line_re,
-                subject,
-                strlen((char*)subject),
-                0,
-                0,
-                line_matchd,
-                NULL);
-        if (*rc < 0) { 
-                fprintf(stderr,"pcre2_match failed at line %d\n", line);
-                return 0;
-        }
-        if (!*rc) {
-                perror("ovector");
-                return 0;
-        }
-        *ov = pcre2_get_ovector_pointer(line_matchd);
-        return 1;
-}
-
-int
-match_arg(PCRE2_SPTR subject, int line, int *rc, size_t **ov) {
-        *rc = pcre2_match(
-                arg_re,
-                subject,
-                strlen((char*)subject),
-                0,
-                0,
-                arg_matchd,
-                NULL);
-        if (*rc < 0) { 
-                fprintf(stderr,"pcre2_match failed at line %d\n", line);
-                return 0;
-        }
-        if (!*rc) {
-                perror("ovector");
-                return 0;
-        }
-        *ov = pcre2_get_ovector_pointer(arg_matchd);
-        return 1;
-}
-
-int
-match_str(PCRE2_SPTR subject, size_t len, int line, int *rc, size_t **ov) {
-        *rc = pcre2_match(
-                str_re,
-                subject,
-                len,
-                0,
-                0,
-                str_matchd,
-                NULL);
-        if (*rc < 0) { 
-                fprintf(stderr,"Failed to match string at line %d\n", line);
-                return 0;
-        }
-        if (!*rc) {
-                perror("ovector");
-                return 0;
-        }
-        *ov = pcre2_get_ovector_pointer(str_matchd);
-        return 1;
-}
-
-int
-match_size(PCRE2_SPTR subject, int line, int *rc, size_t **ov) {
-        *rc = pcre2_match(
-                size_re,
-                subject,
-                strlen((char*)subject),
-                0,
-                0,
-                size_matchd,
-                NULL);
-        if (*rc < 0) { 
-                fprintf(stderr,"Failed to match size for .BLOCK at line %d\n", line);
-                return 0;
-        }
-        if (!*rc) {
-                perror("ovector");
-                return 0;
-        }
-        *ov = pcre2_get_ovector_pointer(size_matchd);
-        return 1;
-}
-
-int
-add_label(PCRE2_SPTR id, size_t len, size_t pos) {
-        if (label_cnt >= MAXLBL) {
-                perror("Too many labels");
-                return 0;
-        }
-        source_labels[label_cnt].id = (char*)id;
-        source_labels[label_cnt].id_len = len;
-        source_labels[label_cnt].pos = pos;
-        printf("Found Label \"%.*s\" at position %zu\n",
-                        (int)source_labels[label_cnt].id_len,
-                        source_labels[label_cnt].id,
-                        source_labels[label_cnt].pos);
-        label_cnt++;
-        return 1;
-}
-
-size_t 
-instr_byte_size(PCRE2_SPTR instr, size_t instr_len,
-                PCRE2_SPTR arg, size_t arg_len) 
-{
-        // .BYTE: add 1 to bytecode_pos
-        // .WORD: add 2 to bytecode_pos
-        // .ADDRESS : add 2 to bytecode_pos
-        // .ASCII : add len of string to bytecode_pos
-        // .BLOCK: add arg to bytecode_pos
-        // Otherwise add 3 to bytecode_pos
-        if (!instr_len) return 0;
-        printf("  instr: [%.*s]\n", (int)instr_len, instr);
-        printf("  arg: [%.*s]\n", (int)arg_len, arg);
-        if (instr[0] == '.') {
-                if (strncmp((char*)instr, ".BYTE", 5) == 0)
-                        return 1;
-                else if (strncmp((char*)instr, ".WORD", 5) == 0)
-                        return 2;
-                else if (strncmp((char*)instr, ".ADDRESS", 8) == 0)
-                        return 2;
-                else if (strncmp((char*)instr, ".ASCII", 6) == 0) {
-                        int rc;
-                        size_t *ov;
-                        if (!match_str(arg, arg_len, 0, &rc, &ov))
-                                return -1;
-                        // char *str = arg + ov[2*1];
-                        int str_len = ov[2*1+1] - ov[2*1];
-                        printf("  Size of string is %d\n", str_len);
-                        // TODO handle escape characters
-                        // Parse again with a special regex
-                        return str_len;
-                } else if (strncmp((char*)instr, ".BLOCK", 6) == 0) {
-                        int rc;
-                        size_t *ov;
-                        if (!match_size(arg, 0, &rc, &ov))
-                                return -1;
-                        char *size_c = (char*)arg + ov[2*1];
-                        int size;
-                        sscanf(size_c, "%d", &size);
-                        printf("  Size of block is %d\n", size);
-                        return size;
-                } else return 3;
-        } else {
-                return 3;
-        }
-}
-
 void
 print_match(PCRE2_SPTR subject, int rc, size_t *ov) {
         FORI(i, 0, rc) {
@@ -328,15 +174,17 @@ print_match(PCRE2_SPTR subject, int rc, size_t *ov) {
  *First find labels and store their respective positions
  *Then parse Instruction and block command to determine the bytecode
 */
+
 int
-parse()
+parse(char *program, uint16_t *program_size)
 {
         assert(_initialized);
         
         size_t *ovector;
         int rc;
         // first pass, identify labels and their positions in the final bytecode
-        size_t bytecode_pos = 0;
+        uint16_t bytecode_pos = 0; 
+        // Shouldn't be bigger than the accessible adressing page of 16 bit
         FORI(i, 0, lines_cnt) {
                 PCRE2_SPTR line = (PCRE2_SPTR)source_lines[i];
                 printf("Matching \"%s\"\n", line);
@@ -366,6 +214,40 @@ parse()
                 int arg_len = ovector[2*6 + 1] - ovector[2*6];
                 bytecode_pos += instr_byte_size(instr, instr_len, arg, arg_len);
         }
+        printf("Parsing labels success: Bytecode size: %hu\n", bytecode_pos);
+
+        // Second pass, convert each instruction to bytecode along with arguments
+        char bytecode[bytecode_pos];
+        bytecode_pos = 0;
+        FORI(i, 0, lines_cnt) {
+                PCRE2_SPTR line = (PCRE2_SPTR)source_lines[i];
+                printf("Matching \"%s\"\n", line);
+                if (!match_line(line, i, &rc, &ovector)) {
+                        parser_failure();
+                        return 0;
+                }
+                PCRE2_SPTR match = line + ovector[2*0];
+                size_t match_len = ovector[2*0+1] - ovector[2*0];
+                printf("Matched \"%.*s\"\n", (int)match_len, match);
+                print_match(line, rc, ovector);
+
+                PCRE2_SPTR instr = line + ovector[2*2];
+                int instr_len = ovector[2*2 + 1] - ovector[2*2];
+                PCRE2_SPTR arg = line + ovector[2*6];
+                int arg_len = ovector[2*6 + 1] - ovector[2*6];
+                if (!instr_byte_code(
+                        instr,
+                        instr_len,
+                        arg,
+                        arg_len,
+                        bytecode, &bytecode_pos)) {
+                        perror("Error when generating the bytecode\n");
+                        parser_failure();
+                        return 0;
+                }
+        }
+        memcpy(program, bytecode, bytecode_pos);
+        *program_size  = bytecode_pos;
         return 1;
 }
 

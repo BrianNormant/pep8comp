@@ -12,26 +12,33 @@
 
 /* TODO list
    - pep 8 compiler
-   [ ] Support for comment
+   [x] Support for comment
    [ ] Support for escape sequences in string
    [ ] Support for escape sequences in characters
+   [ ] Support for instruction ret2 ret3, ect
+   [ ] Support for more escape sequences (currently n,r,t,x)
+   [ ] Option for raw string literals (without null terminator)
    [x] identify labels
-   [ ] convert intruction to bytecode and generate assembly code
-   
+   [t] convert .dot command to bytecode
+   [ ] convert intruction to bytecode and generate assembly code  
+
    - pep 8 emulator
-   [ ] register
-   [ ] basic arithmetic addr subr aslr ect...
-   [ ] basic I/O
+   [ ] registers
+   [ ] I/O
+   [ ] arithmetic addr, subr, aslr, ...
+   [ ] control flow (BR, BREQ, ...)
    [ ] memory read and write
    [ ] jumps
    [ ] calls
    [ ] addressing modes
    [ ] stack
+   
    Special
-   [ ] Bitshift instructions
-   [ ] Floating point support
-   [ ] 
+   ; extend the simulated cpu to 32 to support more instructions
 */
+
+static char program[500]; // FIXME
+static uint16_t program_size;
 int main(int argc, char *argv[]) {
         // Check correct usage
         switch (argc) {
@@ -53,7 +60,8 @@ int main(int argc, char *argv[]) {
         // Parse file syntax
         parse_init(f);
         print_parsed();
-        if (!parse()) return EXIT_FAILURE;
+        if (!parse(program, &program_size)) return EXIT_FAILURE;
+        printf_bytes(program, program_size);
         parse_deinit();
 
         // Close file
