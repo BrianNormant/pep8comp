@@ -248,7 +248,7 @@ instr_byte_code(PCRE2_SPTR instr, size_t instr_len,
                 }
                 perror("Wrong argument for .block");
                 return 0;
-        } else if (strncmp((char*)instr_r, ".address", instr_len) == 0) {
+        } else if (strncmp((char*)instr_r, ".addrss", instr_len) == 0) {
                 // get the address of label
                 int lbl_i = get_label(arg, arg_len);
                 if (lbl_i == -1) {
@@ -301,7 +301,7 @@ instr_byte_size(PCRE2_SPTR instr, size_t instr_len,
                         return 1;
                 else if (strncmp((char*)instr_r, ".word", instr_len) == 0)
                         return 2;
-                else if (strncmp((char*)instr_r, ".address", instr_len) == 0)
+                else if (strncmp((char*)instr_r, ".addrss", instr_len) == 0)
                         return 2;
                 else if (strncmp((char*)instr_r, ".ascii", instr_len) == 0) {
                         int rc;
